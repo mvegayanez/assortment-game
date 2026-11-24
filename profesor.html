@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Panel del profesor · Juego del surtido</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/style.css">
+  <style>
+    main { max-width: 1200px; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 18px; }
+    .toolbar label { display: grid; gap: 4px; font-weight: 800; font-size: 13px; }
+    .toolbar select { font: inherit; padding: 8px; border: 3px solid var(--ink); border-radius: 0; background: #fff; }
+    .toolbar .btn { padding: 8px 14px; }
+    .kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 18px; }
+    .kpi { background: #fff; border: 3px solid var(--ink); box-shadow: var(--shadow); padding: 12px; }
+    .kpi .v { font-family: var(--pixel); font-size: 20px; color: var(--red); margin-top: 6px; }
+    .kpi .l { font-size: 13px; font-weight: 800; color: var(--muted); }
+    .grid2 { display: grid; grid-template-columns: 1fr 1.4fr; gap: 18px; margin-bottom: 18px; align-items: start; }
+    h2 { font-size: 18px; margin: 0 0 12px; }
+    table.t { width: 100%; border-collapse: collapse; font-size: 14px; }
+    table.t th { text-align: left; background: var(--ink); color: #fff; padding: 8px; font-size: 12px; }
+    table.t td { padding: 7px 8px; border-bottom: 1px solid #ddd; vertical-align: top; }
+    table.t tr:nth-child(even) td { background: #fbf7ee; }
+    .rate { font-family: var(--pixel); font-size: 11px; }
+    .rate.hi { color: var(--bad); } .rate.mid { color: #c77c00; } .rate.lo { color: var(--green); }
+    .small { font-size: 12px; color: var(--muted); }
+    .gate { max-width: 380px; margin: 80px auto; text-align: center; }
+    .gate input { font: inherit; font-size: 22px; text-align: center; letter-spacing: 6px; padding: 10px; width: 160px; border: 3px solid var(--ink); }
+    .empty { padding: 30px; text-align: center; color: var(--muted); }
+    @media (max-width: 860px) { .kpis { grid-template-columns: repeat(2, 1fr); } .grid2 { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header class="hud"><div class="logo">🛒 LA DESPENSA · PANEL DEL PROFESOR</div></header>
+  <main id="app"></main>
+  <footer class="credit">by <b>@profesormariovega</b></footer>
+  <script src="config.js"></script>
+  <script src="assets/data.js"></script>
+  <script src="assets/common.js"></script>
+  <script>
+  (function () {
+    const app = document.getElementById("app"), E = U.esc;
+    const P = { grupo: U.param("grupo") || "", periodo: "hoy", data: [], grupos: [] };
+    let ok = false; try { ok = sessionStorage.getItem("surtido_prof") === "1"; } catch (e) {}
+
+    function gate() {
+      app.innerHTML = `<div class="card gate"><h2>🔒 Acceso profesor</h2>
+        <form id="g"><input id="pin" type="password" inputmode="numeric" autocomplete="off" placeholder="PIN"><br><br>
+        <button class="btn primary" type="submit">Entrar</button></form><p id="ge" class="small"></p></div>`;
+      document.getElementById("g").onsubmit = e => {
+        e.preventDefault();
+        if (document.getElementById("pin").value === String((window.CONFIG || {}).PROFESOR_PIN || "")) {
+          ok = true; try { sessionStorage.setItem("surtido_prof", "1"); } catch (e) {} load();
+        } else document.getElementById("ge").textContent = "PIN incorrecto";
+      };
+    }
+
+    function desde() {
+      const d = new Date();
+      if (P.periodo === "hoy") { d.setHours(0, 0, 0, 0); return d.toISOString(); }
+      if (P.periodo === "7d") { d.setDate(d.getDate() - 7); return d.toISOString(); }
+      return undefined;
+    }
+
+    async function load() {
+      app.innerHTML = `<p class="empty">Cargando…</p>`;
+      try {
+        const all = await DB.list({ desde: desde() });
+        P.grupos = [...new Set(all.map(x => x.grupo || ""))].sort();
+        P.data = P.grupo ? all.filter(x => (x.grupo || "") === P.grupo) : all;
+        render();
+      } catch (e) { app.innerHTML = `<p class="warn">Error al leer Supabase: ${E(e.message)}</p>`; }
+    }
+
+    function itemLabel(r, id) {
+      const d = describeFallo({ r, item: id, dada: null, correcta: null }, "es");
+      return d.q;
+    }
+
+    function render() {
+      const D = P.data;
+      const toolbar = `<div class="toolbar">
+        <label>Grupo<select id="fg"><option value="">Todos</option>${P.grupos.map(g => `<option ${g === P.grupo ? "selected" : ""} value="${E(g)}">${E(g || "(sin grupo)")}</option>`).join("")}</select></label>
+        <label>Periodo<select id="fp">${[["hoy", "Hoy"], ["7d", "Últimos 7 días"], ["todo", "Todo"]].map(([v, l]) => `<option value="${v}" ${v === P.periodo ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+        <button class="btn" id="rf">↻ Actualizar</button>
+        <button class="btn" id="csv">⬇ CSV</button>
+        <a class="btn primary" href="ranking.html${P.grupo ? "?grupo=" + encodeURIComponent(P.grupo) : ""}" target="_blank">🕹️ Ranking para proyectar</a>
+        <a class="btn" href="index.html${P.grupo ? "?grupo=" + encodeURIComponent(P.grupo) : ""}" target="_blank">🔗 Enlace del juego</a>
+      </div>${DB.enabled ? "" : `<p class="warn">Modo prueba: sin Supabase configurado. Solo ves las partidas jugadas en este navegador.</p>`}`;
+
+      if (!D.length) { app.innerHTML = toolbar + `<div class="card empty">Todavía no hay partidas con este filtro.</div>`; bind(); return; }
+
+      // Alumnos
+      const byStu = {};
+      D.forEach(x => { const k = U.normName(x.nombre) + "|" + (x.grupo || ""); (byStu[k] = byStu[k] || []).push(x); });
+      const stus = Object.values(byStu).map(list => {
+        list.sort((a, b) => a.created_at < b.created_at ? -1 : 1);
+        const best = list.reduce((a, b) => b.puntos > a.puntos ? b : a);
+        return { nombre: list[0].nombre, grupo: list[0].grupo, n: list.length, best, first: list[0], last: list[list.length - 1],
+          pistas: (list.reduce((a, x) => a + (x.pistas || 0), 0) / list.length) };
+      }).sort((a, b) => b.best.puntos - a.best.puntos);
+
+      // Primeras partidas (lo más fiel para el diagnóstico de la clase)
+      const firsts = stus.map(s => s.first);
+      const avg = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+      const kp = [
+        ["Partidas", D.length], ["Alumnos", stus.length],
+        ["Media 1.er intento", Math.round(avg(firsts.map(x => x.porcentaje))) + " %"],
+        ["Media mejor intento", Math.round(avg(stus.map(s => s.best.porcentaje))) + " %"],
+        ["Pistas por partida", avg(D.map(x => x.pistas || 0)).toFixed(1)]
+      ];
+
+      // Aciertos por ronda (primer intento)
+      const rondas = [1, 2, 3, 4, 5].map(r => {
+        const rs = firsts.map(x => (x.rondas || []).find(y => y.r === r)).filter(Boolean);
+        const okN = rs.reduce((a, y) => a + y.aciertos, 0), tot = rs.reduce((a, y) => a + y.total, 0);
+        return { r, pct: tot ? Math.round(100 * okN / tot) : 0, pistas: avg(rs.map(y => y.pistas)).toFixed(1) };
+      });
+
+      // Ítems más fallados (todas las partidas del filtro)
+      const seen = {}, fails = {}, wrong = {};
+      D.forEach(x => {
+        (x.rondas || []).forEach(y => (y.items || []).forEach(id => { const k = y.r + "|" + id; seen[k] = (seen[k] || 0) + 1; }));
+        (x.fallos || []).forEach(f => {
+          const k = f.r + "|" + f.item; fails[k] = (fails[k] || 0) + 1;
+          const w = f.dada == null ? "∅" : f.dada; wrong[k] = wrong[k] || {}; wrong[k][w] = (wrong[k][w] || 0) + 1;
+        });
+      });
+      const items = Object.keys(fails).map(k => {
+        const [r, id] = k.split("|"); const n = Math.max(seen[k] || 0, fails[k]);
+        const topW = Object.entries(wrong[k]).sort((a, b) => b[1] - a[1])[0];
+        const d = describeFallo({ r: +r, item: id, dada: topW[0] === "∅" ? null : topW[0], correcta: (D.flatMap(x => x.fallos || []).find(f => f.r == r && f.item === id) || {}).correcta }, "es");
+        return { r: +r, id, label: d.q, fails: fails[k], n, rate: fails[k] / n, wrongTop: d.dada, wrongN: topW[1], ok: d.ok };
+      }).sort((a, b) => b.fails - a.fails || b.rate - a.rate).slice(0, 20);
+
+      const t = TXT.es;
+      app.innerHTML = toolbar + `
+        <div class="kpis">${kp.map(([l, v]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div></div>`).join("")}</div>
+        <div class="grid2">
+          <section class="card"><h2>Aciertos por ronda <span class="small">(primer intento de cada alumno)</span></h2>
+            <div class="bars">${rondas.map(x => `<div class="bar" style="grid-template-columns:170px 1fr 48px"><span>${x.r}. ${E(t.rondaNombres[x.r - 1])}</span><div class="bar-bg"><div class="bar-fg" style="width:${x.pct}%;background:${x.pct < 50 ? "var(--bad)" : x.pct < 75 ? "var(--yellow)" : "var(--green)"}"></div></div><b>${x.pct}%</b></div>`).join("")}</div>
+            <p class="small">Pistas medias por ronda: ${rondas.map(x => `R${x.r} ${x.pistas}`).join(" · ")}</p>
+          </section>
+          <section class="card"><h2>Ítems más fallados <span class="small">(para el debrief)</span></h2>
+            <table class="t"><thead><tr><th>R</th><th>Ítem</th><th>Fallo</th><th>Respuesta errónea más común</th><th>Correcta</th></tr></thead><tbody>
+            ${items.map(x => `<tr><td>${x.r}</td><td>${E(x.label)}</td><td><span class="rate ${x.rate >= .5 ? "hi" : x.rate >= .25 ? "mid" : "lo"}">${Math.round(100 * x.rate)}%</span><br><span class="small">${x.fails}/${x.n}</span></td><td>${E(x.wrongTop)} <span class="small">(${x.wrongN})</span></td><td>${E(x.ok || "")}</td></tr>`).join("")}
+            </tbody></table></section>
+        </div>
+        <section class="card"><h2>Alumnos</h2>
+          <table class="t"><thead><tr><th>Alumno</th><th>Grupo</th><th>Iniciales</th><th>Intentos</th><th>1.er intento</th><th>Mejor</th><th>Puesto</th><th>Pistas/partida</th></tr></thead><tbody>
+          ${stus.map(s => `<tr><td>${E(s.nombre)}</td><td>${E(s.grupo || "")}</td><td>${E(s.best.iniciales)}</td><td>${s.n}</td><td>${s.first.puntos} <span class="small">(${s.first.porcentaje}%)</span></td><td><b>${s.best.puntos}</b> <span class="small">(${s.best.porcentaje}%)</span></td><td>${E(s.best.rango || "")}</td><td>${s.pistas.toFixed(1)}</td></tr>`).join("")}
+          </tbody></table></section>`;
+      bind();
+    }
+
+    function bind() {
+      const g = document.getElementById("fg"), p = document.getElementById("fp");
+      if (g) g.onchange = () => { P.grupo = g.value; load(); };
+      if (p) p.onchange = () => { P.periodo = p.value; load(); };
+      const rf = document.getElementById("rf"); if (rf) rf.onclick = load;
+      const c = document.getElementById("csv"); if (c) c.onclick = csv;
+    }
+
+    function csv() {
+      const head = ["fecha", "nombre", "grupo", "iniciales", "idioma", "puntos", "porcentaje", "rango", "pistas", "duracion_seg", "r1", "r2", "r3", "r4", "r5", "n_fallos"];
+      const rows = P.data.map(x => {
+        const r = [1, 2, 3, 4, 5].map(i => ((x.rondas || []).find(y => y.r === i) || {}).puntos ?? "");
+        return [x.created_at, x.nombre, x.grupo, x.iniciales, x.idioma, x.puntos, x.porcentaje, x.rango, x.pistas, x.duracion_seg, ...r, (x.fallos || []).length];
+      });
+      const q = v => `"${String(v == null ? "" : v).replace(/"/g, '""')}"`;
+      const txt = "﻿" + [head, ...rows].map(r => r.map(q).join(";")).join("\n");
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([txt], { type: "text/csv;charset=utf-8" }));
+      a.download = `juego-surtido_${P.grupo || "todos"}_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+    }
+
+    ok ? load() : gate();
+  })();
+  </script>
+</body>
+</html>

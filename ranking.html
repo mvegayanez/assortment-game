@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HIGH SCORES · La Despensa</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/style.css">
+  <style>
+    body { background: #000; background-image: none; }
+    .screen { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px 16px; font-family: var(--pixel); color: #fff; position: relative; overflow: hidden; }
+    .screen::after { content: ""; position: fixed; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(255,255,255,.05) 0 2px, transparent 2px 4px); }
+    .logo-a { font-size: clamp(22px, 4.5vw, 54px); color: #ff3df5; text-shadow: 4px 4px 0 #00f0ff; margin-bottom: 10px; text-align: center; }
+    .sub-a { color: #ffde00; font-size: clamp(14px, 2.2vw, 26px); margin-bottom: 34px; text-shadow: 0 0 10px #ff8c00; }
+    .screen .arcade-t { font-size: clamp(14px, 2.4vw, 30px); }
+    .screen .arcade-t th { font-size: clamp(10px, 1.4vw, 18px); padding: 10px 28px; }
+    .screen .arcade-t td { padding: 12px 28px; }
+    .screen .arcade-t td:nth-child(4) { font-size: .55em; color: #aaa !important; text-align: left; }
+    .foot { margin-top: 34px; font-size: clamp(10px, 1.4vw, 16px); color: #39ff14; }
+    .new { animation: flash .9s steps(2, start) 6; }
+    .err { color: #ff4d4d; font-size: 12px; margin-top: 20px; font-family: var(--body); }
+  </style>
+</head>
+<body>
+  <div class="screen">
+    <div class="logo-a">🛒 LA DESPENSA</div>
+    <div class="sub-a" id="sub">HIGH SCORES</div>
+    <div id="board"><p class="blink">LOADING…</p></div>
+    <div class="foot blink">INSERT COIN · PLAY AGAIN</div>
+    <div class="foot" style="color:#00f0ff;margin-top:14px">by @profesormariovega</div>
+    <div class="err" id="err"></div>
+  </div>
+  <script src="config.js"></script>
+  <script src="assets/data.js"></script>
+  <script src="assets/common.js"></script>
+  <script>
+    const grupo = U.param("grupo");
+    document.getElementById("sub").textContent = "HIGH SCORES" + (grupo ? " · " + grupo : "");
+    let prevIds = new Set();
+    async function load() {
+      try {
+        const list = await DB.top({ grupo: grupo || undefined, n: 10 });
+        const rows = [];
+        for (let i = 0; i < 10; i++) {
+          const x = list[i];
+          const isNew = x && prevIds.size && !prevIds.has(x.id);
+          rows.push(`<tr class="c${i % 5} ${isNew ? "new" : ""}"><td>${i === 0 && x ? "👑" : String(i + 1).padStart(2, "0")}</td><td>${x ? U.esc(x.iniciales) : "---"}</td><td>${x ? String(x.puntos).padStart(3, "0") : "000"}</td><td>${x ? U.esc(x.rango || "") : ""}</td></tr>`);
+        }
+        document.getElementById("board").innerHTML = `<table class="arcade-t"><thead><tr><th>RANK</th><th>NAME</th><th>SCORE</th><th></th></tr></thead><tbody>${rows.join("")}</tbody></table>`;
+        prevIds = new Set(list.map(x => x.id));
+        document.getElementById("err").textContent = DB.enabled ? "" : "Modo prueba: sin Supabase, solo se ven las partidas de este navegador.";
+      } catch (e) { document.getElementById("err").textContent = "Error al cargar el ranking: " + e.message; }
+    }
+    load(); setInterval(load, 10000);
+  </script>
+</body>
+</html>
