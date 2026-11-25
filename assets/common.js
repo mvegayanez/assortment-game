@@ -70,6 +70,8 @@ window.TXT = {
     modoPrueba: "Modo prueba: sin conexión a Supabase, las partidas se guardan solo en este navegador.",
     ranking: "TOP 10",
     revision: "Revisa tus fallos",
+    tuPos: (p, n) => p ? `Tu posición: ${p}º de ${n}` : "",
+    miGrupo: "Mi grupo", todos: "Todos los grupos", verRanking: "Ver ranking completo ↗",
     sinFallos: "¡Ni un solo fallo en esta ronda!",
     tuRespuesta: "Tu respuesta",
     correcta: "Correcta",
@@ -171,6 +173,8 @@ window.TXT = {
     modoPrueba: "Test mode: no Supabase connection, games are only saved in this browser.",
     ranking: "TOP 10",
     revision: "Review your mistakes",
+    tuPos: (p, n) => p ? `Your rank: ${p} of ${n}` : "",
+    miGrupo: "My group", todos: "All groups", verRanking: "Full ranking ↗",
     sinFallos: "Not a single mistake in this round!",
     tuRespuesta: "Your answer",
     correcta: "Correct",
@@ -299,11 +303,12 @@ window.DB = (function () {
     return r.json();
   }
   // Mejor partida de cada alumno (nombre + grupo)
-  async function top({ grupo, n = 10 } = {}) {
+  async function ranking({ grupo } = {}) {
     const all = await list({ grupo, limit: 1000 });
     const seen = new Set(), out = [];
-    for (const x of all) { const k = U.normName(x.nombre) + "|" + (x.grupo || ""); if (seen.has(k)) continue; seen.add(k); out.push(x); if (out.length >= n) break; }
+    for (const x of all) { const k = U.normName(x.nombre) + "|" + (x.grupo || ""); if (seen.has(k)) continue; seen.add(k); out.push(x); }
     return out;
   }
-  return { enabled, save, list, top };
+  async function top({ grupo, n = 10 } = {}) { return (await ranking({ grupo })).slice(0, n); }
+  return { enabled, save, list, top, ranking };
 })();

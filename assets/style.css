@@ -275,3 +275,7 @@ main.final { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-ite
 .scope button { background: transparent; border: 2px solid #fff; color: #fff; font-family: var(--pixel); font-size: 9px; padding: 8px 10px; }
 .scope button.on { background: #ffde00; color: #000; border-color: #ffde00; }
 .arcade .btn { position: relative; z-index: 1; font-family: var(--pixel); font-size: 10px; background: #fff; }
+
+main.center.home { flex-direction: column; align-items: center; gap: 24px; }
+.home-rank { width: 100%; max-width: 640px; }
+.arcade a.btn { color: var(--ink); }

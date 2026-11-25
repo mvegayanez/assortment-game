@@ -15,7 +15,7 @@
     grupoFijo: !!U.param("grupo"),
     r: 0, res: [], fallos: [], cur: null, deadline: 0, timer: null,
     modal: null, timeout: false, ini: ["A", "A", "A"], iniPos: 0,
-    saveState: "idle", saved: null, top: null, scope: "grupo", myPos: 0, rankTotal: 0, mine: null, startedAt: 0, feedback: null
+    saveState: "idle", saved: null, top: null, scope: "grupo", home: null, homeScope: (U.param("grupo") ? "grupo" : "todos"), myPos: 0, rankTotal: 0, mine: null, startedAt: 0, feedback: null
   };
   const T = () => TXT[S.lang || "es"];
   const L = () => S.lang || "es";
@@ -177,7 +177,7 @@
   }
 
   function scrLang() {
-    return `<main class="center">
+    return `<main class="center home">
       <div class="title-card">
         <div class="pixel big">🛒 LA DESPENSA</div>
         <p class="sub">Primer día en el súper · First day at the supermarket</p>
@@ -187,7 +187,15 @@
           <button class="btn big" data-action="setlang" data-l="es">🇪🇸 Español</button>
           <button class="btn big" data-action="setlang" data-l="en">🇬🇧 English</button>
         </div>
-      </div></main>`;
+      </div>
+      <section class="arcade home-rank">
+        <div class="pixel arcade-title">${S.homeScope === "grupo" && S.grupo ? "TOP 10 · " + E(S.grupo) : "TOP 10 · HIGH SCORES"}</div>
+        ${S.grupo ? `<div class="scope">${[["grupo", "Mi grupo / My group"], ["todos", "Todos / All"]].map(([v, l]) => `<button data-action="homescope" data-s="${v}" class="${S.homeScope === v ? "on" : ""}">${l}</button>`).join("")}</div>` : ""}
+        ${topTable(S.home && S.home.top, "", true)}
+        ${S.home && S.home.total ? `<p class="pixel small" style="color:#39ff14">${S.home.total} ${S.home.total === 1 ? "PLAYER" : "PLAYERS"}</p>` : ""}
+        <a class="btn" style="display:inline-block;margin-top:8px;text-decoration:none" target="_blank" rel="noopener" href="ranking.html${S.homeScope === "grupo" && S.grupo ? "?grupo=" + encodeURIComponent(S.grupo) : ""}">Ranking ↗</a>
+        ${DB.enabled ? "" : `<p class="warn">${TXT.es.modoPrueba}</p>`}
+      </section></main>`;
   }
   function scrWelcome() {
     const t = T();
@@ -284,7 +292,7 @@
     const pct = Math.min(100, Math.round(total / 5));
     return { total, pct };
   }
-  function topTable(list, highlightKey) {
+  function topTable(list, highlightKey, hideMine) {
     if (!list) return `<p class="muted pixel small blink">LOADING…</p>`;
     const rows = [];
     for (let i = 0; i < 10; i++) {
@@ -292,7 +300,7 @@
       const me = x && (U.normName(x.nombre) + "|" + (x.grupo || "")) === highlightKey;
       rows.push(`<tr class="${me ? "me" : ""} c${i % 5}"><td>${String(i + 1).padStart(2, "0")}</td><td>${x ? E(x.iniciales) : "---"}</td><td>${x ? String(x.puntos).padStart(3, "0") : "000"}</td></tr>`);
     }
-    if (S.mine) rows.push(`<tr><td colspan="3">· · ·</td></tr>`, `<tr class="me"><td>${String(S.myPos).padStart(2, "0")}</td><td>${E(S.mine.iniciales)}</td><td>${String(S.mine.puntos).padStart(3, "0")}</td></tr>`);
+    if (S.mine && !hideMine) rows.push(`<tr><td colspan="3">· · ·</td></tr>`, `<tr class="me"><td>${String(S.myPos).padStart(2, "0")}</td><td>${E(S.mine.iniciales)}</td><td>${String(S.mine.puntos).padStart(3, "0")}</td></tr>`);
     return `<table class="arcade-t"><thead><tr><th>RANK</th><th>NAME</th><th>SCORE</th></tr></thead><tbody>${rows.join("")}</tbody></table>`;
   }
   function scrFinal() {
@@ -456,6 +464,14 @@
     render();
   }
 
+  async function loadHome() {
+    try {
+      const all = await DB.ranking({ grupo: (S.homeScope === "grupo" && S.grupo) ? S.grupo : undefined });
+      S.home = { top: all.slice(0, 10), total: all.length };
+    } catch (e) { console.error(e); S.home = { top: [], total: 0 }; }
+    if (S.screen === "lang") render();
+  }
+
   async function loadRank() {
     S.top = null; render();
     try {
@@ -537,6 +553,7 @@
       const k = A.indexOf(S.ini[i]); S.ini[i] = A[(k + (a === "iniup" ? 1 : -1) + A.length) % A.length]; S.iniPos = i; render();
     }
     else if (a === "save") save();
+    else if (a === "homescope") { S.homeScope = el.dataset.s; S.home = null; render(); loadHome(); }
     else if (a === "scope") { S.scope = el.dataset.s; loadRank(); }
     else if (a === "again") { setupGame(); S.r = 1; setupRound(1); S.screen = "brief"; render(); window.scrollTo(0, 0); }
   }
@@ -609,5 +626,6 @@
   if (saved && U.param("lang") !== "choose") { S.lang = saved; }
   if (U.param("lang") === "es" || U.param("lang") === "en") { S.lang = U.param("lang"); S.screen = "welcome"; }
   render();
+  loadHome(); setInterval(() => { if (S.screen === "lang") loadHome(); }, 20000);
   window.__S = S; // para depuración
 })();
