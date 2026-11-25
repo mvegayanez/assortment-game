@@ -265,8 +265,9 @@ window.describeFallo = function (f, lang) {
 // ---------- Base de datos (Supabase REST, con respaldo local) ----------
 window.DB = (function () {
   const C = window.CONFIG || {};
-  const url = (C.SUPABASE_URL || "").replace(/\/$/, "");
-  const key = C.SUPABASE_ANON_KEY || "";
+  let url = (C.SUPABASE_URL || "").trim();
+  try { if (url) url = new URL(url.startsWith("http") ? url : "https://" + url).origin; } catch (e) { url = url.replace(/\/+$/, ""); }
+  const key = (C.SUPABASE_ANON_KEY || "").trim();
   const enabled = !!(url && key);
   const T = "surtido_partidas";
   const LKEY = "surtido_partidas_local";
