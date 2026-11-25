@@ -270,3 +270,8 @@ main.final { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-ite
 .credit { text-align: center; padding: 18px 16px 26px; font-size: 14px; color: var(--muted); }
 .credit b { font-family: var(--pixel); font-size: 11px; color: var(--red); font-weight: normal; }
 .by-title { font-size: 12px; color: var(--ink); margin: 6px 0 22px; }
+
+.scope { display: flex; justify-content: center; gap: 8px; margin-bottom: 14px; position: relative; z-index: 1; }
+.scope button { background: transparent; border: 2px solid #fff; color: #fff; font-family: var(--pixel); font-size: 9px; padding: 8px 10px; }
+.scope button.on { background: #ffde00; color: #000; border-color: #ffde00; }
+.arcade .btn { position: relative; z-index: 1; font-family: var(--pixel); font-size: 10px; background: #fff; }

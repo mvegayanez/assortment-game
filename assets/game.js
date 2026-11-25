@@ -15,7 +15,7 @@
     grupoFijo: !!U.param("grupo"),
     r: 0, res: [], fallos: [], cur: null, deadline: 0, timer: null,
     modal: null, timeout: false, ini: ["A", "A", "A"], iniPos: 0,
-    saveState: "idle", saved: null, top: null, startedAt: 0, feedback: null
+    saveState: "idle", saved: null, top: null, scope: "grupo", myPos: 0, rankTotal: 0, mine: null, startedAt: 0, feedback: null
   };
   const T = () => TXT[S.lang || "es"];
   const L = () => S.lang || "es";
@@ -292,6 +292,7 @@
       const me = x && (U.normName(x.nombre) + "|" + (x.grupo || "")) === highlightKey;
       rows.push(`<tr class="${me ? "me" : ""} c${i % 5}"><td>${String(i + 1).padStart(2, "0")}</td><td>${x ? E(x.iniciales) : "---"}</td><td>${x ? String(x.puntos).padStart(3, "0") : "000"}</td></tr>`);
     }
+    if (S.mine) rows.push(`<tr><td colspan="3">· · ·</td></tr>`, `<tr class="me"><td>${String(S.myPos).padStart(2, "0")}</td><td>${E(S.mine.iniciales)}</td><td>${String(S.mine.puntos).padStart(3, "0")}</td></tr>`);
     return `<table class="arcade-t"><thead><tr><th>RANK</th><th>NAME</th><th>SCORE</th></tr></thead><tbody>${rows.join("")}</tbody></table>`;
   }
   function scrFinal() {
@@ -325,7 +326,10 @@
       <section class="arcade">
         <div class="pixel arcade-title blink">${t.ranking}${S.grupo ? " · " + E(S.grupo) : ""}</div>
         ${initials}
-        ${S.saveState === "saved" ? topTable(S.top, key) : `<p class="pixel small muted-a">INSERT COIN ▶ ${t.guardar.toUpperCase()}</p>`}
+        ${S.saveState === "saved" ? `${S.grupo ? `<div class="scope">${[["grupo", t.miGrupo], ["todos", t.todos]].map(([v, l]) => `<button data-action="scope" data-s="${v}" class="${S.scope === v ? "on" : ""}">${l}</button>`).join("")}</div>` : ""}
+          ${topTable(S.top, key)}
+          ${S.myPos ? `<p class="pixel small" style="color:#39ff14">${t.tuPos(S.myPos, S.rankTotal)}</p>` : ""}
+          <a class="btn" style="display:inline-block;margin-top:8px;text-decoration:none" target="_blank" rel="noopener" href="ranking.html${S.scope === "grupo" && S.grupo ? "?grupo=" + encodeURIComponent(S.grupo) : ""}">${t.verRanking}</a>` : `<p class="pixel small muted-a">INSERT COIN ▶ ${t.guardar.toUpperCase()}</p>`}
         ${DB.enabled ? "" : `<p class="warn">${t.modoPrueba}</p>`}
       </section>
       <section class="card review"><h2>${t.revision}</h2>${review}
@@ -452,6 +456,19 @@
     render();
   }
 
+  async function loadRank() {
+    S.top = null; render();
+    try {
+      const all = await DB.ranking({ grupo: (S.scope === "grupo" && S.grupo) ? S.grupo : undefined });
+      const key = U.normName(S.nombre) + "|" + (S.grupo || "");
+      S.rankTotal = all.length;
+      S.myPos = all.findIndex(x => (U.normName(x.nombre) + "|" + (x.grupo || "")) === key) + 1;
+      S.top = all.slice(0, 10);
+      S.mine = S.myPos > 10 ? all[S.myPos - 1] : null;
+    } catch (e) { console.error(e); S.top = []; }
+    render();
+  }
+
   async function save() {
     if (S.saveState === "saving" || S.saveState === "saved") return;
     S.saveState = "saving"; render();
@@ -466,7 +483,7 @@
     try {
       S.saved = await DB.save(row);
       S.saveState = "saved"; render();
-      S.top = await DB.top({ grupo: S.grupo || undefined, n: 10 });
+      await loadRank(); return;
     } catch (e) {
       console.error(e); S.saveErr = String((e && e.message) || e).slice(0, 400); S.saveState = "error";
     }
@@ -520,6 +537,7 @@
       const k = A.indexOf(S.ini[i]); S.ini[i] = A[(k + (a === "iniup" ? 1 : -1) + A.length) % A.length]; S.iniPos = i; render();
     }
     else if (a === "save") save();
+    else if (a === "scope") { S.scope = el.dataset.s; loadRank(); }
     else if (a === "again") { setupGame(); S.r = 1; setupRound(1); S.screen = "brief"; render(); window.scrollTo(0, 0); }
   }
 
@@ -527,7 +545,7 @@
     e.preventDefault();
     const f = new FormData(e.target);
     S.nombre = String(f.get("nombre") || "").trim().slice(0, 60);
-    if (!S.grupoFijo) S.grupo = String(f.get("grupo") || "").trim().slice(0, 30);
+    if (!S.grupoFijo) S.grupo = String(f.get("grupo") || "").trim().toUpperCase().slice(0, 30);
     if (!S.nombre) return;
     U.ls.set("surtido_nombre", S.nombre); if (!S.grupoFijo) U.ls.set("surtido_grupo", S.grupo);
     const parts = U.normName(S.nombre).toUpperCase().replace(/[^A-Z ]/g, "").split(" ").filter(Boolean);
